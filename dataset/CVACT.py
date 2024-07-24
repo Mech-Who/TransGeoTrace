@@ -43,7 +43,7 @@ def input_transform(size):
 
 # pytorch implementation of CVACT loader
 class CVACT(torch.utils.data.Dataset):
-    def __init__(self, mode='', root='/path/dataset/CVACT/ANU_data_small/', same_area=True, print_bool=False, args=None):
+    def __init__(self, mode='', root='/raid/liyuanyuan/Datasets/CVACT/ANU_data_small/', same_area=True, print_bool=False, args=None):
         super(CVACT, self).__init__()
 
         self.args = args

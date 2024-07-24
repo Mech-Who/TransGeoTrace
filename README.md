@@ -43,25 +43,31 @@ Please download [CVUSA](http://mvrl.cs.uky.edu/datasets/cvusa/), [CVACT](https:/
 To train our method on CVUSA for 50 epochs run:
 
 ```shell
-python -u train.py --lr 0.0001 --batch-size 32 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result_cvusa --op sam --wd 0.03 --mining --dataset cvusa --cos --dim 3072 --asam --rho 2.5
+python -W ignore::UserWarning -u train.py --lr 0.0001 --batch-size 32 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result/cvusa --op sam --wd 0.03 --mining --dataset cvusa --cos --dim 3072 --asam --rho 2.5
 ```
 
 To train our method on CVACT for 50 epochs run:
 
 ```shell
-python -u train.py --lr 0.0001 --batch-size 32 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result_cvact --op sam --wd 0.03 --mining --dataset cvact --cos --dim 3072 --asam --rho 2.5
+python -W ignore::UserWarning -u train.py --lr 0.0001 --batch-size 32 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result/cvact --op sam --wd 0.03 --mining --dataset cvact --cos --dim 3072 --asam --rho 2.5
 ```
 
 To train our method on VIGOR Same-Area for 50 epochs run:
 
 ```shell
-python -u train.py --lr 0.00005 --batch-size 16 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result_vigor --op sam --wd 0.03 --mining --dataset vigor --cos --dim 3072 --asam --rho 2.5
+python -W ignore::UserWarning -u train.py --lr 0.00005 --batch-size 16 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result/vigor --op sam --wd 0.03 --mining --dataset vigor --cos --dim 3072 --asam --rho 2.5
 ```
 
 To train our method on VIGOR Cross-Area for 50 epochs run:
 
 ```shell
-python -u train.py --lr 0.00005 --batch-size 16 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result_vigor_cross --op sam --wd 0.03 --mining --dataset vigor --cos --dim 3072 --asam --rho 2.5 --cross
+python -W ignore::UserWarning -u train.py --lr 0.00005 --batch-size 16 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result/vigor_cross --op sam --wd 0.03 --mining --dataset vigor --cos --dim 3072 --asam --rho 2.5 --cross
+```
+
+To train our method on CVOGL for 50 epochs run:
+
+```shell
+python -W ignore::UserWarning -u train.py --lr 0.0001 --batch-size 32 --dist-url 'tcp://localhost:8080' --multiprocessing-distributed --world-size 1 --rank 0  --epochs 50 --save_path ./result/cvogl --op sam --wd 0.03 --mining --dataset cvogl --data_name CVOGL_DroneAerial --cos --dim 3072 --asam --rho 2.5 --log_file ./result/cvogl/train_cvogl.log
 ```
 
 ## Evaluation

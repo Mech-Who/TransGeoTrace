@@ -43,7 +43,7 @@ def input_transform(size):
 
 # pytorch version of CVUSA loader
 class CVUSA(torch.utils.data.Dataset):
-    def __init__(self, mode='', root='/path/dataset/CVUSA/', same_area=True, print_bool=False,args=None): #CV-dataset
+    def __init__(self, mode='', root='/raid/liyuanyuan/Datasets/CVUSA/', same_area=True, print_bool=False,args=None): #CV-dataset
         super(CVUSA, self).__init__()
 
         self.args = args

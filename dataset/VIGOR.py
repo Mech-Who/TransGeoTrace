@@ -44,7 +44,7 @@ def input_transform(size):
 
 # Same loader from VIGOR, modified for pytorch
 class VIGOR(torch.utils.data.Dataset):
-    def __init__(self, mode='', root='/path/dataset/VIGOR/', same_area=True, print_bool=False, args=None):
+    def __init__(self, mode='', root='/raid/liyuanyuan/Datasets/VIGOR/', same_area=True, print_bool=False, args=None):
         super(VIGOR, self).__init__()
 
         self.args = args

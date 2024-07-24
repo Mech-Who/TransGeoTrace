@@ -1,11 +1,15 @@
-import argparse
-import builtins
-import math
 import os
+import sys
+import math
+import time
+import errno
 import random
 import shutil
-import time
+import argparse
+import builtins
 import warnings
+import logging
+from datetime import datetime
 
 import torch
 import torch.nn.parallel
@@ -16,18 +20,19 @@ import torch.multiprocessing as mp
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.models as models
-from datetime import datetime
 
 import numpy as np
 from dataset.VIGOR import VIGOR
 from dataset.CVUSA import CVUSA
 from dataset.CVACT import CVACT
+from dataset.CVOGL import CVOGL
 from model.FRGeo import FRGeo
 from criterion.wbloss import WBLoss
 from dataset.global_sampler import DistributedMiningSampler,DistributedMiningSamplerVigor
 from criterion.sam import SAM
 from ptflops import get_model_complexity_info
 
+logger = logging.getLogger(__name__)
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"  # 2 GPU
@@ -93,8 +98,12 @@ parser.add_argument('--cos', action='store_true',
 parser.add_argument('--cross', action='store_true',
                     help='use cross area')
 
-parser.add_argument('--dataset', default='cvact', type=str,
-                    help='cvusa, cvact, vigor')
+parser.add_argument('--dataset', default='cvogl', type=str,
+                    help='cvusa, cvact, vigor, cvogl')
+
+parser.add_argument('--data_name', defualt='CVOGL_DroneAerial', type=str,
+                    help='subset\'s name when dataset is cvogl')
+
 parser.add_argument('--op', default='adam', type=str,
                     help='sgd, adam, adamw')
 
@@ -112,6 +121,11 @@ parser.add_argument('--rho', default=0.05, type=float,
 parser.add_argument('--fov', default=0, type=int,
                     help='Fov')
 
+parser.add_argument('--log_file', default="train.log", type=str,
+                    help='filename to write log info')
+
+parser.add_argument('--log_level', default="INFO", type=str,
+                    help='default as INFO, log level to choose: DEBUG, INFO, WARNING, ERROR, CRITICAL, FATAL')
 
 best_acc1 = 0
 
@@ -139,13 +153,46 @@ def compute_complexity(model, args):
         macs_2, params_2 = get_model_complexity_info(model.module.reference_net, (3, size_sat[0] , size_sat[1] ),
                                                      as_strings=False,
                                                      print_per_layer_stat=True, verbose=True)
-
-        print('flops:', (macs_1+macs_2)/1e9, 'params:', (params_1+params_2)/1e6)
+        flops = (macs_1+macs_2)/1e9
+        params = (params_1+params_2)/1e6
+        logger.info('flops:%f params:%f', flops, params)
+        print('flops:', flops, 'params:', params)
 
 
 
 def main():
+
     args = parser.parse_args()
+
+    # SEPERATOR: logger setting
+    basic_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
+    terminal_handler = logging.StreamHandler(sys.stdout)
+    terminal_handler.setFormatter(basic_formatter)
+    file_handler = logging.FileHandler(filename=args.log_file, mode="a")
+    file_handler.setFormatter(basic_formatter)
+
+    level = logging.INFO
+    if 'INFO' == args.log_level:
+        level = logging.INFO
+    elif 'DEBUG' == args.log_level:
+        level = logging.DEBUG
+    elif 'WARNING' == args.log_level:
+        level = logging.WARNING
+    elif 'ERROR' == args.log_level:
+        level = logging.ERROR
+    elif 'CRITICAL' == args.log_level:
+        level = logging.CRITICAL
+    elif 'FATAL' == args.log_level:
+        level = logging.FATAL
+    else:
+        logging.warning("Unknown log level '%s', fall back to 'INFO'", args.log_level)
+        print(f"Unknown log level '{args.log_level}', fall back to 'INFO'")
+
+    logging.basicConfig(level=level, handlers=[terminal_handler, file_handler])
+
+    # SEPERATOR: main process
+    logger.info("%s", str(args))
     print(args)
 
     if args.seed is not None:
@@ -181,6 +228,7 @@ def main():
 
 
 def main_worker(gpu, ngpus_per_node, args):
+    global logger
     global best_acc1
     args.gpu = gpu
     args.ngpus_per_node = ngpus_per_node
@@ -192,6 +240,7 @@ def main_worker(gpu, ngpus_per_node, args):
         builtins.print = print_pass
 
     if args.gpu is not None:
+        logger.info("Use GPU: %d for training", args.gpu)
         print("Use GPU: {} for training".format(args.gpu))
 
     if args.distributed:
@@ -204,7 +253,8 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
     # create model
-    print("=> creating model '{}'")
+    logger.info("=> creating model '%s'", "FRGeo")
+    print("=> creating model '%s'", "FRGeo")
 
     model = FRGeo(args=args)
 
@@ -236,6 +286,7 @@ def main_worker(gpu, ngpus_per_node, args):
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
     for name, param in model.named_parameters():
         if param.requires_grad:
+            logger.info("%s", str(name))
             print(name)
     # compute_complexity(model, args)  # uncomment to see detailed computation cost
     criterion = WBLoss().cuda(args.gpu)
@@ -255,6 +306,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # optionally resume from a checkpoint
     if args.resume:
         if os.path.isfile(args.resume):
+            logger.info("=> loading checkpoint '%s'", args.resume)
             print("=> loading checkpoint '{}'".format(args.resume))
             if args.gpu is None:
                 checkpoint = torch.load(args.resume)
@@ -268,9 +320,11 @@ def main_worker(gpu, ngpus_per_node, args):
             model.load_state_dict(checkpoint['state_dict'])
             if args.op == 'sam' and args.dataset != 'cvact':    # Loading the optimizer status gives better result on CVUSA, but not on CVACT.
                 optimizer.load_state_dict(checkpoint['optimizer'])
+            logger.info("=> loaded checkpoint '%s' (epoch %d)", args.resume, checkpoint['epoch'])
             print("=> loaded checkpoint '{}' (epoch {})"
                   .format(args.resume, checkpoint['epoch']))
         else:
+            logger.info("=> no checkpoint found at '%s'", args.resume)
             print("=> no checkpoint found at '{}'".format(args.resume))
 
     cudnn.benchmark = True
@@ -289,8 +343,14 @@ def main_worker(gpu, ngpus_per_node, args):
     elif args.dataset == 'cvact':
         dataset = CVACT
         mining_sampler = DistributedMiningSampler
+    # ADD: 添加CVOGL数据集
+    elif args.dataset == 'cvogl':
+        dataset = CVOGL
+        mining_sampler = DistributedMiningSampler
+    else:
+        raise NotImplementedError(f"dataset '{args.dataset}' not implemented!")
 
-    train_dataset = dataset(mode='train', print_bool=True, same_area=(not args.cross),args=args)
+    train_dataset = dataset(mode='train', print_bool=True, same_area=(not args.cross), args=args)
     val_query_dataset = dataset(mode='test_query', same_area=(not args.cross), args=args)
     val_reference_dataset = dataset(mode='test_reference', same_area=(not args.cross), args=args)
 
@@ -321,8 +381,9 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     for epoch in range(args.start_epoch, args.epochs):
-
-        print('start epoch:{}, date:{}'.format(epoch, datetime.now()))
+        now = str(datetime.now())
+        logger.info("start epoch:%d, date:%s", epoch, now)
+        print('start epoch:{}, date:{}'.format(epoch, now))
         if args.distributed:
             train_sampler.set_epoch(epoch)
             if args.mining:
@@ -559,7 +620,7 @@ def adjust_learning_rate(optimizer, epoch, args):
         param_group['lr'] = lr
 
 
-def accuracy(query_features, reference_features, query_labels, topk=[1,5,10]):
+def accuracy(query_features, reference_features, query_labels, topk=[1,5,10], logger=logging.getLogger(__name__)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     ts = time.time()
     N = query_features.shape[0]
@@ -596,7 +657,9 @@ def accuracy(query_features, reference_features, query_labels, topk=[1,5,10]):
                         results[j] += 1.
 
     results = results/ query_features.shape[0] * 100.
-    print('Percentage-top1:{}, top5:{}, top10:{}, top1%:{}, time:{}'.format(results[0], results[1], results[2], results[-1], time.time() - ts))
+    last_time = time.time() - ts
+    logger.info("Percentage-top1:%f, top5:%f, top10:%f, top1%:%f, time:%f", results[0], results[1], results[2], results[-1], last_time)
+    print('Percentage-top1:{}, top5:{}, top10:{}, top1%:{}, time:{}'.format(results[0], results[1], results[2], results[-1], last_time))
     return results[:2]
 
 # utils
@@ -613,6 +676,13 @@ def concat_all_gather(tensor):
     output = torch.cat(tensors_gather, dim=0)
     return output
 
+
+def mkdir_if_missing(dir_path):
+    try:
+        os.makedirs(dir_path)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            raise
 
 if __name__ == '__main__':
     main()
