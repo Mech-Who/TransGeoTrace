@@ -35,7 +35,7 @@ from ptflops import get_model_complexity_info
 logger = logging.getLogger(__name__)
 
 os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1"  # 2 GPU
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2"  # 2 GPU
 
 model_names = sorted(name for name in models.__dict__
     if name.islower() and not name.startswith("__")
@@ -101,7 +101,7 @@ parser.add_argument('--cross', action='store_true',
 parser.add_argument('--dataset', default='cvogl', type=str,
                     help='cvusa, cvact, vigor, cvogl')
 
-parser.add_argument('--data_name', defualt='CVOGL_DroneAerial', type=str,
+parser.add_argument('--data_name', default='CVOGL_DroneAerial', type=str,
                     help='subset\'s name when dataset is cvogl')
 
 parser.add_argument('--op', default='adam', type=str,
@@ -143,6 +143,13 @@ def compute_complexity(model, args):
         size_sat = [256, 256]  # [512, 512]
         size_sat_default = [256, 256]  # [512, 512]
         size_grd = [128, 512] # [224, 1232]
+    elif args.dataset == 'cvogl':
+        size_sat = [1024, 1024]  # [512, 512]
+        size_sat_default = [1024, 1024]  # [512, 512]
+        if args.data_name == 'CVOGL_DroneAerial':
+            size_grd = [512, 256] # [224, 1232]
+        else:
+            size_grd = [256, 256]
 
     if args.fov != 0:
         size_grd[1] = int(args.fov /360. * size_grd[1])
@@ -169,6 +176,11 @@ def main():
 
     terminal_handler = logging.StreamHandler(sys.stdout)
     terminal_handler.setFormatter(basic_formatter)
+    # create before use
+    if args.log_file is not None:
+        mkdir_if_missing(os.path.dirname(args.log_file))
+        with open(args.log_file, "w"):
+            pass
     file_handler = logging.FileHandler(filename=args.log_file, mode="a")
     file_handler.setFormatter(basic_formatter)
 
@@ -254,7 +266,7 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
     # create model
     logger.info("=> creating model '%s'", "FRGeo")
-    print("=> creating model '%s'", "FRGeo")
+    print("=> creating model FRGeo")
 
     model = FRGeo(args=args)
 
@@ -437,7 +449,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args, train_sampler=
             indexes = indexes.cuda(args.gpu, non_blocking=True)
 
         # compute output
-        embed_q, embed_k = model(im_q =images_q, im_k=images_k)
+        embed_q, embed_k = model(im_q=images_q, im_k=images_k)
 
         loss, mean_p, mean_n = criterion(embed_q, embed_k)
 

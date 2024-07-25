@@ -31,6 +31,13 @@ class FRGeo(nn.Module):
             self.size_sat = [256, 256]
             self.size_sat_default = [256, 256]
             self.size_grd = [128, 512]
+        elif args.dataset == 'cvogl':
+            self.size_sat = [1024, 1024]
+            self.size_sat_default = [1024, 1024]
+            if args.data_name == 'CVOGL_DroneAerial':
+                self.size_grd = [256, 256]
+            elif args.data_name == 'CVOGL_SVI':
+                self.size_grd = [512, 256]
 
         if args.fov != 0:
             self.size_grd[1] = int(args.fov / 360. * self.size_grd[1])

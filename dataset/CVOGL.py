@@ -47,7 +47,7 @@ def input_transform(size):
 
 # Same loader from CVOGL, modified for pytorch
 class CVOGL(torch.utils.data.Dataset):
-    def __init__(self, mode='', root='/raid/lingxingtao/dataset/CVOGL/', same_area=True, print_bool=False, args=None,
+    def __init__(self, mode='', root='/data/hushuhan/codes/dataset/CVOGL', same_area=True, print_bool=False, args=None,
                  sat_size=[1024, 1024], grd_size=[256, 256]):
         super(CVOGL, self).__init__()
         # SEPERATOR: init
@@ -98,7 +98,8 @@ class CVOGL(torch.utils.data.Dataset):
         self.id_list = [] # [(sat_img, grd_img, id)]
         self.id_idx_list = [] # [idx]
         self.id_data_list = [] # [(sat_img, grd_img, gt_box, click_xy)]
-        self.train_list = torch.load(self.train_list_fname)
+        self.train_list = torch.load(self.train_list_fname, weights_only=False)
+        idx = 0
         for data in self.train_list:
             id, grd_img, sat_img, _, click_xy, gt_box, _, _ = data
             sat_img = os.path.join(self.sat_root, sat_img)
@@ -108,7 +109,7 @@ class CVOGL(torch.utils.data.Dataset):
             self.id_list.append((sat_img, grd_img, id)) # use tuple instead of list
             self.id_idx_list.append(idx)
             idx += 1
-        self.train_data_size = len(self.train_sat_list)
+        self.train_data_size = len(self.train_list)
 
         if print_bool:
             logger.info("load train set: %s", self.train_list_fname)
@@ -121,6 +122,8 @@ class CVOGL(torch.utils.data.Dataset):
         self.id_test_list = []
         self.id_test_idx_list = []
         self.id_test_data_list = []
+        self.test_list = torch.load(self.test_list_fname, weights_only=False)
+        idx = 0
         for data in self.test_list:
             id, grd_img, sat_img, _, click_xy, gt_box, _, _ = data
             sat_img = os.path.join(self.sat_root, sat_img)
@@ -140,20 +143,20 @@ class CVOGL(torch.utils.data.Dataset):
     def __getitem__(self, index, debug=False):
         if self.mode == 'train':
             idx = index % len(self.id_idx_list)
-            img_query = Image.open(self.root + self.id_list[idx][1]).convert('RGB')
-            img_reference = Image.open(self.root + self.id_list[idx][0]).convert('RGB')
+            img_query = Image.open(self.id_list[idx][1]).convert('RGB')
+            img_reference = Image.open(self.id_list[idx][0]).convert('RGB')
 
             img_query = self.transform_query(img_query)
             img_reference = self.transform_reference(img_reference)
             return img_query, img_reference, torch.tensor(idx), torch.tensor(idx)
 
         elif 'test_reference' in self.mode:
-            img_reference = Image.open(self.root + self.id_test_list[index][0]).convert('RGB')
+            img_reference = Image.open(self.id_test_list[index][0]).convert('RGB')
             img_reference = self.transform_reference(img_reference)
             return img_reference, torch.tensor(index)
 
         elif 'test_query' in self.mode:
-            img_query = Image.open(self.root + self.id_test_list[index][1]).convert('RGB')
+            img_query = Image.open(self.id_test_list[index][1]).convert('RGB')
             img_query = self.transform_query(img_query)
             return img_query, torch.tensor(index), torch.tensor(index)
         else:
