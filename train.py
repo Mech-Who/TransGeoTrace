@@ -296,10 +296,11 @@ def main_worker(gpu, ngpus_per_node, args):
         model = torch.nn.DataParallel(model).cuda()
 
     parameters = list(filter(lambda p: p.requires_grad, model.parameters()))
-    for name, param in model.named_parameters():
-        if param.requires_grad:
-            logger.info("%s", str(name))
-            print(name)
+    # DELETE: 打印参数，调试的时候再用
+    # for name, param in model.named_parameters():
+    #     if param.requires_grad:
+    #         logger.info("%s", str(name))
+    #         print(name)
     # compute_complexity(model, args)  # uncomment to see detailed computation cost
     criterion = WBLoss().cuda(args.gpu)
 
@@ -421,7 +422,10 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_acc1': best_acc1,
                 'optimizer': optimizer.state_dict(),
             }, is_best, filename='checkpoint.pth.tar', args=args) # 'checkpoint_{:04d}.pth.tar'.format(epoch)
-
+        
+        # 正常退出程序前销毁进程组
+        if dist.is_initialized():
+            dist.destroy_process_group()
 
 def train(train_loader, model, criterion, optimizer, epoch, args, train_sampler=None):
     batch_time = AverageMeter('Time', ':6.3f')
